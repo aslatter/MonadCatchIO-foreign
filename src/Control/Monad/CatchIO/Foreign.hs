@@ -1,4 +1,12 @@
-{-# LANGUAGE CPP, MagicHash, UnboxedTuples, PatternSignatures #-}
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples #-}
+{-|
+  This module assumes that you are familiar with the funcitons
+  of the same name in Foreign.Marshall.Alloc, Foreign.Marshal.AllocArray
+  and in Foreign.ForeignPtr.
+
+  The functions are generalized to work in any monad which is an
+  instance of MonadCatchIO.
+ -}
 module Control.Monad.CatchIO.Foreign
     ( alloca
     , allocaBytes
@@ -8,6 +16,8 @@ module Control.Monad.CatchIO.Foreign
     )
     where
 
+-- this is a bit dodgy - we use the MIN_VERSION macro to
+-- see if we're compiled against transformers or mtl
 #ifdef MIN_VERSION_transformers
 import Control.Monad.IO.Class(liftIO)
 #else
@@ -38,7 +48,7 @@ allocaBytesAligned :: (MonadCatchIO m) => Int -> Int -> (Ptr a -> m b) -> m b
 #ifdef __GLASGOW_HASKELL__
 allocaBytesAligned size alignment k
  = do
-  (ba :: P.ByteArray) <- liftIO $ P.newAlignedPinnedByteArray size alignment >>= P.unsafeFreezeByteArray
+  ba <- liftIO $ P.newAlignedPinnedByteArray size alignment >>= P.unsafeFreezeByteArray
   r <- k $ case P.byteArrayContents ba of
              P.Addr addr# -> Ptr addr#
   liftIO $ touch ba
@@ -49,7 +59,7 @@ touch a = IO $ \s -> case touch# a s of
                        s' -> (# s', () #)
 
 #else
-allocaBytesAligned size _ = allocaBytes size -- wrong
+allocaBytesAligned size _ = allocaBytes size -- wrong, but the FFI doesn't offer anything else
 #endif
 
 allocaArray :: (F.Storable a, MonadCatchIO m) => Int -> (Ptr a -> m b) -> m b
